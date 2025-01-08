@@ -17,7 +17,13 @@ local Tab3 = Window:MakeTab({
 local player = game.Players.LocalPlayer
 local teleporting = false
 local farmingFlowers = false
+local selectedWeapon = "Diamond Hammer"
+local selectedMob = nil
 local selectedTool = "Diamond Pickaxe"
+local tools = {
+    "Diamond Pickaxe",
+    "Ginger Pickaxe"
+}
 local plantPartNames = {"Poppy", "Meshes/Flower_Poppy_Flower", "Spots", "Flower"}
 local maxIndex = 74
 local indices = {}
@@ -26,10 +32,19 @@ for i = 1, maxIndex do
     table.insert(indices, i)
 end
 
-local tools = {
-    "Diamond Pickaxe",
-    "Ginger Pickaxe"
-}
+local function getPartName(mobType)
+    local partNames = {
+        ["Slime"] = "Slime_L_Eye",
+        ["Gizmos"] = "Gizmo.001",
+        ["Scatters"] = "Scatter_L_Arm",
+        ["Muchers"] = "Muncher_Head_New",
+        ["Flamelet"] = "Flamelet_Head.001",
+        ["Spiders"] = "Head_Spider_Small",
+        ["Grimthorn"] = "Cube.001",
+        ["Arachnella"] = "Spider_Boss_Eyes"
+    }
+    return partNames[mobType]
+end
 
 local function getClosestPlant()
     local closestPlant = nil
@@ -103,6 +118,53 @@ local function farmPlants()
     end
 end
 
+local function teleportToSelectedMob()
+    local partName = getPartName(selectedMob)
+    if not partName then return end
+
+    while teleporting do
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            wait(1)
+            continue
+        end
+
+        local mobsFolder = game.Workspace:FindFirstChild("Mobs")
+        if mobsFolder then
+            for _, mob in pairs(mobsFolder:GetChildren()) do
+                if mob:IsA("Model") and mob:FindFirstChild(partName) then
+                    local mobPart = mob[partName]
+                    local mobLookVector = mobPart.CFrame.LookVector
+                    player.Character.HumanoidRootPart.CFrame = mobPart.CFrame * CFrame.new(-mobLookVector.X * 3, 0, -mobLookVector.Z * 3)
+                    break
+                end
+            end
+        end
+        wait(0.3)
+    end
+end
+
+local function attackMobs()
+    local partName = getPartName(selectedMob)
+    if not partName then return end
+
+    while teleporting do
+        local mobsFolder = game.Workspace:FindFirstChild("Mobs")
+        if not mobsFolder then return end
+
+        for _, mob in pairs(mobsFolder:GetChildren()) do
+            if mob:IsA("Model") and mob:FindFirstChild(partName) then
+                local args = {
+                    [1] = selectedWeapon,
+                    [2] = {mob:GetAttribute("UUID") or mob.Name},
+                    [3] = true
+                }
+                game:GetService("ReplicatedStorage").Packages.Knit.Services.MobService.RF.AttackMobs:InvokeServer(unpack(args))
+            end
+        end
+        wait(0.05)
+    end
+end
+
 Tab2:AddDropdown({
     Name = "Seleccionar Mob",
     Default = "Ninguno",
@@ -152,4 +214,3 @@ Tab3:AddToggle({
         end
     end
 })
-
