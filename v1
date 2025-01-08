@@ -1,0 +1,167 @@
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/Jext1/HIGHRealms/refs/heads/main/HighRelamsOrion.lua')))()
+
+local Window = OrionLib:MakeWindow({Name = "High Realms", HidePremium = false, SaveConfig = false, ConfigFolder = "OrionTest", IntroEnabled = false})
+
+local Tab2 = Window:MakeTab({
+    Name = "Mob Farm",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+local Tab3 = Window:MakeTab({
+    Name = "Flower Farm",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+local player = game.Players.LocalPlayer
+local teleporting = false
+local farmingFlowers = false
+local plantPartNames = {"Poppy", "Meshes/Flower_Poppy_Flower", "Spots", "Flower"}
+local maxIndex = 74
+local indices = {}
+
+for i = 1, maxIndex do
+    table.insert(indices, i)
+end
+
+local tools = {
+    DiamondPickaxe = {
+        damage = 256,
+        name = "Diamond Pickaxe"
+    },
+    GingerPickaxe = {
+        damage = 275,
+        name = "Ginger Pickaxe"
+    }
+}
+
+local selectedTool = tools.DiamondPickaxe
+
+local function createToolSelectionWindow()
+    local ScreenGui = Instance.new("ScreenGui")
+    local Frame = Instance.new("Frame")
+    local TextLabel = Instance.new("TextLabel")
+    local DiamondButton = Instance.new("TextButton")
+    local GingerButton = Instance.new("TextButton")
+
+    ScreenGui.Parent = game.CoreGui
+
+    Frame.Size = UDim2.new(0, 300, 0, 150)
+    Frame.Position = UDim2.new(0.5, -150, 0.5, -75)
+    Frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Frame.Parent = ScreenGui
+
+    TextLabel.Size = UDim2.new(1, 0, 0.3, 0)
+    TextLabel.Position = UDim2.new(0, 0, 0, 0)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.Text = "Select Your Tool"
+    TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TextLabel.Font = Enum.Font.SourceSans
+    TextLabel.TextSize = 24
+    TextLabel.Parent = Frame
+
+    DiamondButton.Size = UDim2.new(0.8, 0, 0.25, 0)
+    DiamondButton.Position = UDim2.new(0.1, 0, 0.4, 0)
+    DiamondButton.Text = "Diamond Pickaxe"
+    DiamondButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    DiamondButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    DiamondButton.Parent = Frame
+
+    GingerButton.Size = UDim2.new(0.8, 0, 0.25, 0)
+    GingerButton.Position = UDim2.new(0.1, 0, 0.7, 0)
+    GingerButton.Text = "Ginger Pickaxe"
+    GingerButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    GingerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    GingerButton.Parent = Frame
+
+    DiamondButton.MouseButton1Click:Connect(function()
+        selectedTool = tools.DiamondPickaxe
+        ScreenGui:Destroy()
+    end)
+
+    GingerButton.MouseButton1Click:Connect(function()
+        selectedTool = tools.GingerPickaxe
+        ScreenGui:Destroy()
+    end)
+end
+
+createToolSelectionWindow()
+
+local function getClosestPlant()
+    local closestPlant = nil
+    local closestDistance = math.huge
+    local plantsFolder = game.Workspace:FindFirstChild("Island")
+
+    if plantsFolder then
+        for _, part in pairs(plantsFolder:GetDescendants()) do
+            if part:IsA("BasePart") and table.find(plantPartNames, part.Name) then
+                local distance = (player.Character.HumanoidRootPart.Position - part.Position).Magnitude
+                if distance < closestDistance then
+                    closestPlant = part
+                    closestDistance = distance
+                end
+            end
+        end
+    end
+    return closestPlant, closestDistance
+end
+
+local function teleportToPlant()
+    while farmingFlowers do
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            repeat wait(0.1) until player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        end
+
+        local plant, distance = getClosestPlant()
+        if plant then
+            player.Character.HumanoidRootPart.CFrame = plant.CFrame * CFrame.new(0, 3, 0)
+        end
+        wait(0.2)
+    end
+end
+
+local function damageIndicesInBatches(batchSize, delayBetweenBatches)
+    spawn(function()
+        local batch = {}
+        for i, index in ipairs(indices) do
+            table.insert(batch, index)
+            if #batch >= batchSize or i == #indices then
+                for _, batchIndex in ipairs(batch) do
+                    local args = {
+                        [1] = selectedTool.damage,
+                        [2] = {
+                            ["Level"] = 9,
+                            ["Index"] = batchIndex,
+                            ["World"] = "Mines"
+                        }
+                    }
+                    pcall(function()
+                        game:GetService("ReplicatedStorage").Packages.Knit.Services.BlockService.RF.DamageBlock:InvokeServer(unpack(args))
+                    end)
+                end
+                batch = {}
+                wait(delayBetweenBatches)
+            end
+        end
+    end)
+end
+
+local function farmPlants()
+    spawn(teleportToPlant)
+    while farmingFlowers do
+        damageIndicesInBatches(9, 0.05)
+        wait(0.1)
+    end
+end
+
+Tab3:AddToggle({
+    Name = "Flower Farm",
+    Default = false,
+    Callback = function(Value)
+        farmingFlowers = Value
+        if farmingFlowers then
+            spawn(farmPlants)
+        end
+    end
+})
